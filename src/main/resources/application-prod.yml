@@ -1,0 +1,55 @@
+# 운영 환경 설정
+spring:
+  # 데이터베이스 설정 (실제 운영 DB로 변경 필요)
+  datasource:
+    url: jdbc:mysql://localhost:3306/file_extension_db
+    username: ${DB_USERNAME:root}
+    password: ${DB_PASSWORD:}
+    driver-class-name: com.mysql.cj.jdbc.Driver
+  
+  # JPA 설정
+  jpa:
+    hibernate:
+      ddl-auto: validate  # 운영용: 스키마 검증만
+    show-sql: false
+    properties:
+      hibernate:
+        dialect: org.hibernate.dialect.MySQLDialect
+  
+  # H2 콘솔 비활성화
+  h2:
+    console:
+      enabled: false
+  
+  # 파일 업로드 설정
+  servlet:
+    multipart:
+      max-file-size: 5MB
+      max-request-size: 10MB
+  
+  # Thymeleaf 설정
+  thymeleaf:
+    cache: true
+
+# 파일 업로드 디렉토리 (운영용)
+file:
+  upload:
+    dir: /app/uploads
+
+# 서버 설정
+server:
+  port: 8080
+  tomcat:
+    max-threads: 200
+    min-spare-threads: 10
+
+
+# Actuator 설정 (운영용)
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info
+  endpoint:
+    health:
+      show-details: never 

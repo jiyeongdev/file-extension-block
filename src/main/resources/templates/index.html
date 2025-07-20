@@ -1,0 +1,372 @@
+<!DOCTYPE html>
+<html lang="ko" xmlns:th="http://www.thymeleaf.org">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>파일 확장자 차단 시스템</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+
+    <!-- Bootstrap JS -->
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+    <!-- jQuery -->
+    <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+
+    <style>
+        .extension-card {
+            transition: all 0.3s ease;
+        }
+        .extension-card:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 4px 8px rgba(0,0,0,0.1);
+        }
+        .custom-extension-item {
+            background: #f8f9fa;
+            border: 1px solid #dee2e6;
+            border-radius: 8px;
+            padding: 10px 15px;
+            margin: 5px 0;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            transition: all 0.3s ease;
+        }
+        .custom-extension-item:hover {
+            background: #e9ecef;
+        }
+        .delete-btn {
+            color: #dc3545;
+            cursor: pointer;
+            transition: color 0.3s ease;
+        }
+        .delete-btn:hover {
+            color: #c82333;
+        }
+        .toast-container {
+            position: fixed;
+            top: 20px;
+            right: 20px;
+            z-index: 1050;
+        }
+        .progress-bar {
+            height: 8px;
+            border-radius: 4px;
+        }
+        .form-control:focus {
+            border-color: #80bdff;
+            box-shadow: 0 0 0 0.2rem rgba(0, 123, 255, 0.25);
+        }
+        .btn-primary {
+            background-color: #007bff;
+            border-color: #007bff;
+        }
+        .btn-primary:hover {
+            background-color: #0056b3;
+            border-color: #0056b3;
+        }
+        .btn-danger {
+            background-color: #dc3545;
+            border-color: #dc3545;
+        }
+        .btn-danger:hover {
+            background-color: #c82333;
+            border-color: #bd2130;
+        }
+    </style>
+</head>
+<body>
+    <div class="container-fluid py-4">
+        <div class="row">
+            <div class="col-12">
+                <h1 class="text-center mb-4">
+                    <i class="fas fa-shield-alt text-primary"></i>
+                    파일 확장자 차단 시스템
+                </h1>
+            </div>
+        </div>
+
+        <div th:replace="~{fragments/fixedExtensions :: fixedExtensions}"></div>
+
+     
+
+        <div th:replace="~{fragments/customExtensions :: customExtensions}"></div>
+          
+
+        <div th:replace="~{fragments/fileUpload :: fileUpload}"></div>
+       
+    </div>
+
+    <!-- Toast 알림 -->
+    <div class="toast-container" id="toastContainer"></div>
+
+ 
+    <script th:inline="javascript">
+        // 서버에서 전달받은 데이터
+        const fixedExtensions = /*[[${fixedExtensions}]]*/ [];
+        const customExtensions = /*[[${customExtensions}]]*/ [];
+
+        $(document).ready(function() {
+            initializePage();
+            setupEventListeners();
+        });
+
+        function initializePage() {
+            renderFixedExtensions();
+            renderCustomExtensions();
+        }
+
+        function setupEventListeners() {
+            // 고정 확장자 체크박스 이벤트
+            $(document).on('change', '.fixed-extension-checkbox', function() {
+                const id = $(this).data('id');
+                const isChecked = $(this).prop('checked');
+                updateFixedExtensionStatus(id, isChecked);
+            });
+
+            // 커스텀 확장자 추가 버튼 이벤트
+            $('#addCustomExtensionBtn').click(function() {
+                addCustomExtension();
+            });
+
+            // 엔터키 이벤트
+            $('#customExtensionInput').keypress(function(e) {
+                if (e.which === 13) {
+                    addCustomExtension();
+                }
+            });
+
+            // 입력 필드 실시간 유효성 검사
+            $('#customExtensionInput').on('input', function() {
+                const value = $(this).val();
+                $('#charCount').text(value.length);
+                validateInput(value);
+            });
+
+            // 커스텀 확장자 삭제 이벤트
+            $(document).on('click', '.delete-custom-extension', function() {
+                const id = $(this).data('id');
+                const name = $(this).data('name');
+                deleteCustomExtension(id, name);
+            });
+        }
+
+        function renderFixedExtensions() {
+            const container = $('#fixedExtensionsContainer');
+            container.empty();
+
+            fixedExtensions.forEach(function(extension) {
+                const extensionHtml = `
+                    <div class="col-md-6 mb-2">
+                        <div class="form-check">
+                            <input class="form-check-input fixed-extension-checkbox" 
+                                   type="checkbox" 
+                                   id="fixed_${extension.id}"
+                                   data-id="${extension.id}"
+                                   ${extension.isBlocked ? 'checked' : ''}>
+                            <label class="form-check-label" for="fixed_${extension.id}">
+                                <strong>${extension.displayName}</strong>
+                                <br><small class="text-muted">${extension.description}</small>
+                            </label>
+                        </div>
+                    </div>
+                `;
+                container.append(extensionHtml);
+            });
+        }
+
+        function renderCustomExtensions() {
+            const container = $('#customExtensionsContainer');
+            container.empty();
+
+            if (customExtensions.length === 0) {
+                container.html('<p class="text-muted text-center">등록된 커스텀 확장자가 없습니다.</p>');
+                return;
+            }
+
+            customExtensions.forEach(function(extension) {
+                const extensionHtml = `
+                    <div class="custom-extension-item">
+                        <span>
+                            <i class="fas fa-file-code text-primary"></i>
+                            <strong>${extension.extensionName}</strong>
+                        </span>
+                        <button class="btn btn-sm btn-outline-danger delete-custom-extension" 
+                                data-id="${extension.id}" 
+                                data-name="${extension.extensionName}">
+                            <i class="fas fa-times"></i>
+                        </button>
+                    </div>
+                `;
+                container.append(extensionHtml);
+            });
+        }
+
+
+
+        function validateInput(value) {
+            const isValid = /^[a-zA-Z0-9]*$/.test(value);
+            const input = $('#customExtensionInput');
+            const btn = $('#addCustomExtensionBtn');
+
+            if (value.length > 20) {
+                input.addClass('is-invalid');
+                btn.prop('disabled', true);
+                return false;
+            } else if (!isValid && value.length > 0) {
+                input.addClass('is-invalid');
+                btn.prop('disabled', true);
+                return false;
+            } else {
+                input.removeClass('is-invalid');
+                btn.prop('disabled', false);
+                return true;
+            }
+        }
+
+        function updateFixedExtensionStatus(id, isBlocked) {
+            $.ajax({
+                url: `/api/extensions/fixed/${id}/status`,
+                method: 'PUT',
+                data: { isBlocked: isBlocked },
+                success: function(response) {
+                    if (response.success) {
+                        showToast('성공', '고정 확장자 상태가 업데이트되었습니다.', 'success');
+                    } else {
+                        showToast('오류', response.message, 'error');
+                        // 체크박스 상태 되돌리기
+                        $(`#fixed_${id}`).prop('checked', !isBlocked);
+                    }
+                },
+                error: function() {
+                    showToast('오류', '서버 통신에 실패했습니다.', 'error');
+                    // 체크박스 상태 되돌리기
+                    $(`#fixed_${id}`).prop('checked', !isBlocked);
+                }
+            });
+        }
+
+        function addCustomExtension() {
+            const extensionName = $('#customExtensionInput').val().trim();
+            
+            if (!extensionName) {
+                showToast('오류', '확장자명을 입력해주세요.', 'error');
+                return;
+            }
+
+            if (!validateInput(extensionName)) {
+                showToast('오류', '유효하지 않은 확장자명입니다.', 'error');
+                return;
+            }
+
+            $.ajax({
+                url: '/api/extensions/custom',
+                method: 'POST',
+                contentType: 'application/json',
+                data: JSON.stringify({ extensionName: extensionName }),
+                success: function(response) {
+                    if (response.success) {
+                        showToast('성공', '커스텀 확장자가 추가되었습니다.', 'success');
+                        $('#customExtensionInput').val('');
+                        $('#charCount').text('0');
+                        
+                        // 새로 추가된 확장자를 목록에 동적으로 추가
+                        const newExtension = response.data;
+                        const extensionHtml = `
+                            <div class="custom-extension-item">
+                                <span>
+                                    <i class="fas fa-file-code text-primary"></i>
+                                    <strong>${newExtension.extensionName}</strong>
+                                </span>
+                                <button class="btn btn-sm btn-outline-danger delete-custom-extension" 
+                                        data-id="${newExtension.id}" 
+                                        data-name="${newExtension.extensionName}">
+                                    <i class="fas fa-times"></i>
+                                </button>
+                            </div>
+                        `;
+                        
+                        const container = $('#customExtensionsContainer');
+                        if (container.find('.custom-extension-item').length === 0) {
+                            container.empty();
+                        }
+                        container.prepend(extensionHtml);
+                        
+                        // customExtensions 배열에도 추가
+                        customExtensions.unshift(newExtension);
+                    } else {
+                        showToast('오류', response.message, 'error');
+                    }
+                },
+                error: function() {
+                    showToast('오류', '서버 통신에 실패했습니다.', 'error');
+                }
+            });
+        }
+
+        function deleteCustomExtension(id, name) {
+            if (!confirm(`"${name}" 확장자를 삭제하시겠습니까?`)) {
+                return;
+            }
+
+            $.ajax({
+                url: `/api/extensions/custom/${id}`,
+                method: 'DELETE',
+                success: function(response) {
+                    if (response.success) {
+                        showToast('성공', '커스텀 확장자가 삭제되었습니다.', 'success');
+                        
+                        // 목록에서 해당 확장자 제거
+                        $(`.delete-custom-extension[data-id="${id}"]`).closest('.custom-extension-item').remove();
+                        
+                        // customExtensions 배열에서도 제거
+                        const index = customExtensions.findIndex(ext => ext.id === id);
+                        if (index > -1) {
+                            customExtensions.splice(index, 1);
+                        }
+                        
+                        // 목록이 비어있으면 메시지 표시
+                        if ($('#customExtensionsContainer .custom-extension-item').length === 0) {
+                            $('#customExtensionsContainer').html('<p class="text-muted text-center">등록된 커스텀 확장자가 없습니다.</p>');
+                        }
+                    } else {
+                        showToast('오류', response.message, 'error');
+                    }
+                },
+                error: function() {
+                    showToast('오류', '서버 통신에 실패했습니다.', 'error');
+                }
+            });
+        }
+
+    
+
+        function showToast(title, message, type) {
+            const toastId = 'toast_' + Date.now();
+            const bgClass = type === 'success' ? 'bg-success' : 'bg-danger';
+            const icon = type === 'success' ? 'fas fa-check' : 'fas fa-exclamation-triangle';
+
+            const toastHtml = `
+                <div class="toast" id="${toastId}" role="alert">
+                    <div class="toast-header ${bgClass} text-white">
+                        <i class="${icon} me-2"></i>
+                        <strong class="me-auto">${title}</strong>
+                        <button type="button" class="btn-close btn-close-white" data-bs-dismiss="toast"></button>
+                    </div>
+                    <div class="toast-body">
+                        ${message}
+                    </div>
+                </div>
+            `;
+
+            $('#toastContainer').append(toastHtml);
+            const toast = new bootstrap.Toast(document.getElementById(toastId));
+            toast.show();
+
+            // 3초 후 자동 제거
+            setTimeout(function() {
+                $(`#${toastId}`).remove();
+            }, 3000);
+        }
+    </script>
+</body>
+</html> 

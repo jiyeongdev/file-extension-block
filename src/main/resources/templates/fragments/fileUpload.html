@@ -1,0 +1,169 @@
+<div th:fragment="fileUpload">
+    <div class="card">
+        <div class="card-header bg-info text-white">
+            <h5 class="mb-0">
+                <i class="fas fa-upload"></i> 파일 업로드
+            </h5>
+        </div>
+        <div class="card-body">
+            <!-- 업로드 결과 메시지 -->
+            <div id="uploadMessage" class="alert" style="display: none;"></div>
+            
+            <!-- 파일 업로드 폼 (AJAX 방식) -->
+            <form id="fileUploadForm" class="mb-4" enctype="multipart/form-data">
+                <div class="input-group">
+                    <input type="file" name="file" id="fileInput" class="form-control" required>
+                    <button type="submit" class="btn btn-primary" id="uploadBtn">
+                        <span class="spinner-border spinner-border-sm" id="uploadSpinner" style="display: none;"></span>
+                        업로드
+                    </button>
+                </div>
+            </form>
+
+            <!-- 업로드된 파일 목록 -->
+            <h6 class="mt-4">업로드된 파일 목록</h6>
+            <div id="fileList">
+                <p class="text-center text-muted">파일 목록을 불러오는 중...</p>
+            </div>
+        </div>
+    </div>
+
+    <!-- 커스텀 JS (fileUpload 관련) -->
+    <script th:inline="javascript">
+        $(document).ready(function() {
+            loadFileList();
+            setupFileUpload();
+        });
+
+        function setupFileUpload() {
+            $('#fileUploadForm').on('submit', function(e) {
+                e.preventDefault();
+                console.log('submit!!');
+                
+                const fileInput = $('#fileInput')[0];
+                const file = fileInput.files[0];
+                
+                if (!file) {
+                    showMessage('파일을 선택해주세요.', 'warning');
+                    return;
+                }
+
+                // 업로드 버튼 비활성화 및 스피너 표시
+                const uploadBtn = $('#uploadBtn');
+                const spinner = $('#uploadSpinner');
+                uploadBtn.prop('disabled', true);
+                spinner.show();
+
+                const formData = new FormData();
+                formData.append('file', file);
+
+                $.ajax({
+                    url: '/api/files/upload',
+                    type: 'POST',
+                    data: formData,
+                    processData: false,
+                    contentType: false,
+                    success: function(response) {
+                        if (response.success) {
+                            showMessage(response.message, 'success');
+                            $('#fileInput').val(''); // 파일 입력 초기화
+                            loadFileList(); // 파일 목록 새로고침
+                        } else {
+                            showMessage(response.message, 'danger');
+                        }
+                    },
+                    error: function(xhr) {
+                        let message = '업로드 중 오류가 발생했습니다.';
+                        if (xhr.responseJSON && xhr.responseJSON.message) {
+                            message = xhr.responseJSON.message;
+                        }
+                        showMessage(message, 'danger');
+                    },
+                    complete: function() {
+                        // 업로드 버튼 활성화 및 스피너 숨김
+                        uploadBtn.prop('disabled', false);
+                        spinner.hide();
+                    }
+                });
+            });
+        }
+
+        function loadFileList() {
+            $.ajax({
+                url: '/api/files',
+                type: 'GET',
+                success: function(response) {
+                    if (response.success) {
+                        renderFileList(response.data);
+                    } else {
+                        $('#fileList').html('<p class="text-center text-muted">파일 목록을 불러올 수 없습니다.</p>');
+                    }
+                },
+                error: function() {
+                    $('#fileList').html('<p class="text-center text-muted">파일 목록을 불러올 수 없습니다.</p>');
+                }
+            });
+        }
+
+        function renderFileList(files) {
+            if (!files || files.length === 0) {
+                $('#fileList').html('<p class="text-center text-muted">업로드된 파일이 없습니다.</p>');
+                return;
+            }
+
+            let html = '<table class="table table-bordered table-sm mt-2">';
+            html += '<thead><tr><th>파일명</th><th style="width:80px;">삭제</th></tr></thead>';
+            html += '<tbody>';
+            
+            files.forEach(function(file) {
+                html += '<tr>';
+                html += '<td>' + file + '</td>';
+                html += '<td><button class="btn btn-danger btn-sm" onclick="deleteFile(\'' + file + '\')">삭제</button></td>';
+                html += '</tr>';
+            });
+            
+            html += '</tbody></table>';
+            $('#fileList').html(html);
+        }
+
+        function deleteFile(filename) {
+            if (!confirm('정말 삭제하시겠습니까?')) {
+                return;
+            }
+
+            $.ajax({
+                url: '/api/files/' + encodeURIComponent(filename),
+                type: 'DELETE',
+                success: function(response) {
+                    if (response.success) {
+                        showMessage(response.message, 'success');
+                        loadFileList(); // 파일 목록 새로고침
+                    } else {
+                        showMessage(response.message, 'danger');
+                    }
+                },
+                error: function(xhr) {
+                    let message = '삭제 중 오류가 발생했습니다.';
+                    if (xhr.responseJSON && xhr.responseJSON.message) {
+                        message = xhr.responseJSON.message;
+                    }
+                    showMessage(message, 'danger');
+                }
+            });
+        }
+
+        function showMessage(message, type) {
+            console.log('showMessage!!', message, type);
+            const alertDiv = $('#uploadMessage');
+            alertDiv.removeClass('alert-success alert-warning alert-danger')
+                   .addClass('alert-' + type)
+                   .text(message)
+                   .show();
+            
+            // 5초 후 자동으로 숨김
+            setTimeout(function() {
+                alertDiv.fadeOut();
+            }, 5000);
+        }
+    </script>
+</div> 
