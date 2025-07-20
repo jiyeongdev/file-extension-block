@@ -29,6 +29,7 @@ on:
 env:
   ENVIRONMENT: development
   DEPLOY: Y
+  AWS_REGION: ap-northeast-3
 
 jobs:
   build-and-deploy:
@@ -86,7 +87,7 @@ jobs:
         with:
           aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
           aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
-          aws-region: ${{ vars.AWS_REGION }}
+          aws-region: ${{ vars.AWS_REGION || 'ap-northeast-2' }}
 
       - name: Login to Amazon ECR
         id: login-ecr
