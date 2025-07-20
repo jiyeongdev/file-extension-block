@@ -39,8 +39,6 @@ file-extension-proj/
 ├── data/                   # H2 데이터베이스 파일 (로컬)
 ├── uploads/                # 파일 업로드 디렉토리 (로컬)
 ├── logs/                   # 로그 파일 (운영)
-├── Dockerfile              # 도커 이미지 빌드
-├── docker-compose.yml      # 도커 컴포즈 설정
 └── README.md
 ```
 
